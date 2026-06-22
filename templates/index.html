@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT 智能家居多标签故障问答系统</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <h1>IoT 智能家居多标签故障问答</h1>
+      <p class="subtitle">
+        基于多模型对比实验 · 自动识别设备类型并给出处理建议
+      </p>
+      <div class="version-info">
+        API 版本: <span id="api-version">加载中...</span> | 
+        模型状态: <span id="model-status" class="status-loading">检查中...</span>
+      </div>
+    </header>
+
+    <main class="card">
+      <!-- 阈值调节 -->
+      <div class="threshold-control">
+        <label for="threshold" class="label">置信度阈值</label>
+        <div class="threshold-slider">
+          <input type="range" id="threshold" min="0.1" max="0.9" step="0.05" value="0.5" />
+          <span class="threshold-value">0.5</span>
+        </div>
+        <p class="threshold-hint">调整识别灵敏度，值越高越严格</p>
+      </div>
+
+      <form id="qa-form" autocomplete="off">
+        <label for="text" class="label">请输入故障描述</label>
+        <textarea
+          id="text"
+          name="text"
+          rows="4"
+          placeholder="例：扫地机器人充电桩红灯闪烁，无法联网配对"
+          maxlength="500"
+        ></textarea>
+        <div class="char-count">
+          <span id="char-count">0</span> / 500
+        </div>
+        <div class="actions">
+          <button type="submit" id="submit-btn">识别故障</button>
+          <button type="button" id="reset-btn" class="secondary">清空</button>
+        </div>
+      </form>
+
+      <section id="result" class="result hidden">
+        <div class="result-header">
+          <h2>识别结果</h2>
+          <span class="result-count" id="result-count">0 个标签</span>
+        </div>
+        <p class="hint" id="query-echo"></p>
+        <ul id="result-list" class="result-list"></ul>
+      </section>
+
+      <section id="loading" class="loading hidden">
+        <div class="loading-spinner"></div>
+        <span>正在识别，请稍候…</span>
+      </section>
+
+      <section id="error-box" class="error hidden"></section>
+    </main>
+
+    <footer class="footer">
+      <span>Project2_IoT_QA_System · 进阶工程化版本</span>
+    </footer>
+  </div>
+
+  <script>
+    const form = document.getElementById('qa-form');
+    const textInput = document.getElementById('text');
+    const submitBtn = document.getElementById('submit-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const resultBox = document.getElementById('result');
+    const resultList = document.getElementById('result-list');
+    const echoEl = document.getElementById('query-echo');
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error-box');
+    const thresholdInput = document.getElementById('threshold');
+    const thresholdValue = document.querySelector('.threshold-value');
+    const charCount = document.getElementById('char-count');
+    const apiVersion = document.getElementById('api-version');
+    const modelStatus = document.getElementById('model-status');
+
+    function show(node) { node.classList.remove('hidden'); }
+    function hide(node) { node.classList.add('hidden'); }
+
+    // 阈值调节
+    thresholdInput.addEventListener('input', (e) => {
+      thresholdValue.textContent = e.target.value;
+    });
+
+    // 字符计数
+    textInput.addEventListener('input', (e) => {
+      charCount.textContent = e.target.value.length;
+    });
+
+    // 清空按钮
+    resetBtn.addEventListener('click', () => {
+      textInput.value = '';
+      charCount.textContent = '0';
+      hide(resultBox);
+      hide(loading);
+      hide(errorBox);
+    });
+
+    // 健康检查
+    async function checkHealth() {
+      try {
+        const resp = await fetch('/api/health');
+        const data = await resp.json();
+        apiVersion.textContent = data.version || '未知';
+        
+        if (data.model_loaded) {
+          modelStatus.textContent = '已加载';
+          modelStatus.className = 'status-ok';
+        } else {
+          modelStatus.textContent = '未加载';
+          modelStatus.className = 'status-error';
+          errorBox.textContent = '模型未加载，请先运行训练脚本';
+          show(errorBox);
+        }
+      } catch (err) {
+        apiVersion.textContent = '无法连接';
+        modelStatus.textContent = '离线';
+        modelStatus.className = 'status-error';
+      }
+    }
+
+    // 页面加载时检查健康状态
+    checkHealth();
+
+    // 表单提交
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = textInput.value.trim();
+      const threshold = parseFloat(thresholdInput.value);
+
+      if (!text) {
+        errorBox.textContent = '请输入故障描述';
+        show(errorBox);
+        return;
+      }
+
+      hide(errorBox);
+      show(loading);
+      submitBtn.disabled = true;
+
+      try {
+        const resp = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, threshold })
+        });
+        const payload = await resp.json();
+        hide(loading);
+        submitBtn.disabled = false;
+
+        if (payload.code !== 0) {
+          errorBox.textContent = payload.msg || '请求失败';
+          show(errorBox);
+          return;
+        }
+
+        renderResults(text, payload.data || [], threshold);
+      } catch (err) {
+        hide(loading);
+        submitBtn.disabled = false;
+        errorBox.textContent = '网络异常：' + err.message;
+        show(errorBox);
+      }
+    });
+
+    // 渲染结果
+    function renderResults(query, items, threshold) {
+      echoEl.textContent = `原始问题：${query}`;
+      document.getElementById('result-count').textContent = `${items.length} 个标签`;
+      resultList.innerHTML = '';
+
+      items.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'result-item';
+        li.style.animationDelay = `${index * 0.1}s`;
+
+        const header = document.createElement('div');
+        header.className = 'result-header';
+
+        const rank = document.createElement('span');
+        rank.className = 'rank';
+        rank.textContent = `#${index + 1}`;
+
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = item.label;
+
+        const score = document.createElement('span');
+        score.className = 'score';
+        const scorePercent = (item.score * 100).toFixed(1);
+        score.textContent = `${scorePercent}%`;
+
+        // 置信度进度条
+        const scoreBar = document.createElement('div');
+        scoreBar.className = 'score-bar';
+        
+        const scoreFill = document.createElement('div');
+        scoreFill.className = 'score-fill';
+        scoreFill.style.width = `${scorePercent}%`;
+        
+        // 根据置信度设置颜色
+        if (item.score >= 0.8) {
+          scoreFill.className = 'score-fill score-high';
+        } else if (item.score >= 0.5) {
+          scoreFill.className = 'score-fill score-medium';
+        } else {
+          scoreFill.className = 'score-fill score-low';
+        }
+
+        scoreBar.appendChild(scoreFill);
+
+        header.appendChild(rank);
+        header.appendChild(tag);
+        header.appendChild(score);
+
+        const scoreBarContainer = document.createElement('div');
+        scoreBarContainer.className = 'score-bar-container';
+        scoreBarContainer.appendChild(scoreBar);
+
+        const solution = document.createElement('p');
+        solution.className = 'solution';
+        solution.textContent = item.solution;
+
+        li.appendChild(header);
+        li.appendChild(scoreBarContainer);
+        li.appendChild(solution);
+        resultList.appendChild(li);
+      });
+
+      show(resultBox);
+    }
+  </script>
+</body>
+</html>
