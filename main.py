@@ -1,29 +1,26 @@
 """
 main.py
 =======
-Project2_IoT_QA_System — 统一命令行入口
+电商智能客服 NLU 意图识别引擎 — 统一命令行入口
 
 命令:
-    python main.py train [OPTIONS]    训练/评估多标签分类模型
+    python main.py train [OPTIONS]    训练/评估意图分类模型
     python main.py serve [OPTIONS]    启动 Flask 推理服务
-    python main.py predict [OPTIONS]  命令行单次推理
+    python main.py predict [OPTIONS]  命令行单条意图识别
     python main.py info               显示系统信息与配置
 
 示例:
     # 训练逻辑回归模型
     python main.py train --model lr
 
-    # 训练所有模型并对比
+    # 多模型对比实验
     python main.py train --all --compare
-
-    # 使用超参数调优
-    python main.py train --model lr --grid-search
 
     # 启动推理服务
     python main.py serve --host 0.0.0.0 --port 5000
 
-    # 命令行推理
-    python main.py predict --text "空调不制冷"
+    # 命令行意图识别
+    python main.py predict --text "我的订单什么时候发货"
 
     # 查看系统信息
     python main.py info
@@ -218,8 +215,9 @@ def _cmd_predict(args: argparse.Namespace) -> None:
     print(f"阈值: {args.threshold}")
     print("-" * 50)
     for i, r in enumerate(results, 1):
+        action = r.get("action", {})
         print(f"  #{i} [{r['label']}] (置信度: {r['score']:.4f})")
-        print(f"     方案: {r['solution']}")
+        print(f"     路由: {action.get('route', 'N/A')} -> {action.get('target', 'N/A')}")
     print()
 
 
@@ -230,7 +228,7 @@ def _cmd_predict(args: argparse.Namespace) -> None:
 def _cmd_info(args: argparse.Namespace) -> None:
     """显示系统信息与配置。"""
     print("\n" + "=" * 50)
-    print("IoT 智能家居多标签问答系统 — 系统信息")
+    print("电商智能客服 NLU 意图识别引擎 — 系统信息")
     print("=" * 50)
     print(f"Python 版本:     {sys.version.split()[0]}")
     print(f"项目根目录:     {settings.PROJECT_ROOT}")
@@ -276,7 +274,7 @@ def _cmd_info(args: argparse.Namespace) -> None:
 def main(argv: Optional[list] = None) -> None:
     """主入口 — 解析命令行参数并分派子命令。"""
     parser = argparse.ArgumentParser(
-        description="IoT 智能家居多标签故障问答系统 — 企业级工程重构版",
+        description="电商智能客服 NLU 意图识别引擎 — 企业级工程重构版",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:

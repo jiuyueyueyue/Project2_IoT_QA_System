@@ -1,6 +1,6 @@
 /* =========================================
- * Project2_IoT_QA_System  ·  前端样式（进阶版）
- * 设计目标：清爽现代 / 适合作为作品集截图 / 置信度可视化
+ * 电商智能客服 NLU 意图识别引擎 — 前端样式
+ * 设计目标：清爽专业 / 意图路由可视化 / 企业级
  * ========================================= */
 
 * {
@@ -10,25 +10,32 @@
 }
 
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --bg: #f5f7fb;
+  --primary: #7c3aed;
+  --primary-dark: #6d28d9;
+  --bg: #f5f3ff;
   --card-bg: #ffffff;
-  --text: #1f2937;
+  --text: #1e1b4b;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --tag-bg: #eff6ff;
-  --tag-text: #1d4ed8;
+  --tag-bg: #f5f3ff;
+  --tag-text: #6d28d9;
   --error: #dc2626;
-  --success: #16a34a;
+  --success: #059669;
   --warning: #d97706;
   --danger: #dc2626;
-  --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  
+  --shadow: 0 8px 24px rgba(76, 29, 149, 0.08);
+
   /* 置信度颜色 */
-  --score-high: #16a34a;
+  --score-high: #059669;
   --score-medium: #d97706;
   --score-low: #dc2626;
+
+  /* 路由颜色 */
+  --route-rag: #3b82f6;
+  --route-api: #059669;
+  --route-ticket: #f59e0b;
+  --route-human: #ef4444;
+  --route-fallback: #6b7280;
 }
 
 body {
@@ -362,6 +369,40 @@ button:disabled {
   font-size: 14px;
   color: var(--text);
   line-height: 1.7;
+}
+
+/* ---------- 路由信息 ---------- */
+.route-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.route-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  color: #fff;
+}
+
+.route-rag    { background: var(--route-rag); }
+.route-api   { background: var(--route-api); }
+.route-ticket { background: var(--route-ticket); }
+.route-human { background: var(--route-human); }
+.route-fallback { background: var(--route-fallback); }
+
+.route-target {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.route-desc {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
 }
 
 /* ---------- 加载动画 ---------- */

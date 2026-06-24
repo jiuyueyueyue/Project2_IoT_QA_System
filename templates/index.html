@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IoT 智能家居多标签故障问答系统</title>
+  <title>电商智能客服 NLU 意图识别引擎</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
 </head>
 <body>
   <div class="page">
     <header class="hero">
-      <h1>IoT 智能家居多标签故障问答</h1>
+      <h1>电商智能客服 NLU 意图识别引擎</h1>
       <p class="subtitle">
-        基于多模型对比实验 · 自动识别设备类型并给出处理建议
+        对标京小智/飞鸽 · 多标签意图分类 · 自动路由分发
       </p>
       <div class="version-info">
-        API 版本: <span id="api-version">加载中...</span> | 
+        版本: <span id="api-version">加载中...</span> |
         模型状态: <span id="model-status" class="status-loading">检查中...</span>
       </div>
     </header>
@@ -22,36 +22,36 @@
     <main class="card">
       <!-- 阈值调节 -->
       <div class="threshold-control">
-        <label for="threshold" class="label">置信度阈值</label>
+        <label for="threshold" class="label">意图置信度阈值</label>
         <div class="threshold-slider">
-          <input type="range" id="threshold" min="0.1" max="0.9" step="0.05" value="0.5" />
-          <span class="threshold-value">0.5</span>
+          <input type="range" id="threshold" min="0.1" max="0.9" step="0.05" value="0.3" />
+          <span class="threshold-value">0.3</span>
         </div>
-        <p class="threshold-hint">调整识别灵敏度，值越高越严格</p>
+        <p class="threshold-hint">值越低返回越多的潜在意图，值越高越精准</p>
       </div>
 
       <form id="qa-form" autocomplete="off">
-        <label for="text" class="label">请输入故障描述</label>
+        <label for="text" class="label">请输入用户消息</label>
         <textarea
           id="text"
           name="text"
           rows="4"
-          placeholder="例：扫地机器人充电桩红灯闪烁，无法联网配对"
+          placeholder="例：我的订单什么时候发货？这个能退货吗？"
           maxlength="500"
         ></textarea>
         <div class="char-count">
           <span id="char-count">0</span> / 500
         </div>
         <div class="actions">
-          <button type="submit" id="submit-btn">识别故障</button>
+          <button type="submit" id="submit-btn">识别意图</button>
           <button type="button" id="reset-btn" class="secondary">清空</button>
         </div>
       </form>
 
       <section id="result" class="result hidden">
         <div class="result-header">
-          <h2>识别结果</h2>
-          <span class="result-count" id="result-count">0 个标签</span>
+          <h2>意图识别结果</h2>
+          <span class="result-count" id="result-count">0 个意图</span>
         </div>
         <p class="hint" id="query-echo"></p>
         <ul id="result-list" class="result-list"></ul>
@@ -59,14 +59,14 @@
 
       <section id="loading" class="loading hidden">
         <div class="loading-spinner"></div>
-        <span>正在识别，请稍候…</span>
+        <span>正在识别意图，请稍候…</span>
       </section>
 
       <section id="error-box" class="error hidden"></section>
     </main>
 
     <footer class="footer">
-      <span>Project2_IoT_QA_System · 进阶工程化版本</span>
+      <span>电商智能客服 NLU 意图识别引擎 · 企业级工程重构版 · 对标京小智/飞鸽</span>
     </footer>
   </div>
 
@@ -114,14 +114,14 @@
         const resp = await fetch('/api/health');
         const data = await resp.json();
         apiVersion.textContent = data.version || '未知';
-        
+
         if (data.model_loaded) {
-          modelStatus.textContent = '已加载';
+          modelStatus.textContent = '已加载 (' + (data.n_labels || 0) + ' 类意图)';
           modelStatus.className = 'status-ok';
         } else {
           modelStatus.textContent = '未加载';
           modelStatus.className = 'status-error';
-          errorBox.textContent = '模型未加载，请先运行训练脚本';
+          errorBox.textContent = '模型未加载，请先运行 python main.py train';
           show(errorBox);
         }
       } catch (err) {
@@ -131,7 +131,6 @@
       }
     }
 
-    // 页面加载时检查健康状态
     checkHealth();
 
     // 表单提交
@@ -141,7 +140,7 @@
       const threshold = parseFloat(thresholdInput.value);
 
       if (!text) {
-        errorBox.textContent = '请输入故障描述';
+        errorBox.textContent = '请输入用户消息';
         show(errorBox);
         return;
       }
@@ -175,10 +174,35 @@
       }
     });
 
+    // 路由颜色映射
+    function getRouteClass(route) {
+      const map = {
+        'rag_qa': 'route-rag',
+        'order_api': 'route-api',
+        'logistics_api': 'route-api',
+        'ticket_system': 'route-ticket',
+        'human_agent': 'route-human',
+        'fallback': 'route-fallback',
+      };
+      return map[route] || 'route-fallback';
+    }
+
+    function getRouteLabel(route) {
+      const map = {
+        'rag_qa': 'RAG 问答',
+        'order_api': '订单 API',
+        'logistics_api': '物流 API',
+        'ticket_system': '售后工单',
+        'human_agent': '转人工',
+        'fallback': '兜底',
+      };
+      return map[route] || route;
+    }
+
     // 渲染结果
     function renderResults(query, items, threshold) {
-      echoEl.textContent = `原始问题：${query}`;
-      document.getElementById('result-count').textContent = `${items.length} 个标签`;
+      echoEl.textContent = `用户消息：${query}`;
+      document.getElementById('result-count').textContent = `${items.length} 个意图`;
       resultList.innerHTML = '';
 
       items.forEach((item, index) => {
@@ -205,12 +229,11 @@
         // 置信度进度条
         const scoreBar = document.createElement('div');
         scoreBar.className = 'score-bar';
-        
+
         const scoreFill = document.createElement('div');
         scoreFill.className = 'score-fill';
         scoreFill.style.width = `${scorePercent}%`;
-        
-        // 根据置信度设置颜色
+
         if (item.score >= 0.8) {
           scoreFill.className = 'score-fill score-high';
         } else if (item.score >= 0.5) {
@@ -229,13 +252,32 @@
         scoreBarContainer.className = 'score-bar-container';
         scoreBarContainer.appendChild(scoreBar);
 
-        const solution = document.createElement('p');
-        solution.className = 'solution';
-        solution.textContent = item.solution;
+        // 路由信息
+        const action = item.action || {};
+        const routeDiv = document.createElement('div');
+        routeDiv.className = 'route-info';
+
+        const routeBadge = document.createElement('span');
+        routeBadge.className = 'route-badge ' + getRouteClass(action.route);
+        routeBadge.textContent = getRouteLabel(action.route);
+
+        const routeTarget = document.createElement('span');
+        routeTarget.className = 'route-target';
+        routeTarget.textContent = ' → ' + (action.target || 'N/A');
+
+        const routeDesc = document.createElement('p');
+        routeDesc.className = 'route-desc';
+        routeDesc.textContent = action.description || '';
+
+        routeDiv.appendChild(routeBadge);
+        routeDiv.appendChild(routeTarget);
 
         li.appendChild(header);
         li.appendChild(scoreBarContainer);
-        li.appendChild(solution);
+        li.appendChild(routeDiv);
+        if (action.description) {
+          li.appendChild(routeDesc);
+        }
         resultList.appendChild(li);
       });
 

@@ -174,7 +174,12 @@ class TextPreprocessor:
     @staticmethod
     def _remove_punctuation(text: str) -> str:
         """去除中英文标点符号。"""
-        punctuation_chars = string.punctuation + "，。！？、；：「」【】（）《》"·～…—"
+        punctuation_chars = (
+            string.punctuation
+            + "，。！？、；：「」"
+            + "【】（）《》“”"
+            + "·～…—"
+        )
         pattern = re.compile(rf"[{re.escape(punctuation_chars)}]+")
         return pattern.sub("", text)
 

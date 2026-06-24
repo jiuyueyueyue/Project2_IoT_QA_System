@@ -1,25 +1,26 @@
 """
 app.py
 ======
-Project2_IoT_QA_System - IoT 智能家居多标签故障问答系统 Flask 后端
+电商智能客服 NLU 意图识别引擎 — Flask API 层
 
-重构说明（vs 旧版）:
-    - ModelManager / Predictor 提取至 src/inference/ 模块
-    - 配置从 config.settings 单例读取（支持环境变量覆盖）
-    - 日志统一使用 src.utils.logger.setup_logger
-    - 异常使用 src.utils.exceptions 自定义异常类
-    - Flask 路由层保持精简，仅负责请求/响应处理
+业务定位:
+    对标京东京小智、抖音飞鸽智能客服的 NLU 意图识别模块。
+    输入用户消息 → 输出意图类别 + 置信度 + 路由策略，
+    上层客服系统据此做分发（RAG 问答 / 订单 API / 转人工）。
+
+重构说明（v3.0 电商版）:
+    - IoT 智能家居 → 电商客服意图识别（6 类业务意图）
+    - 返回字段 solution → action（路由分发指令）
+    - 其余架构沿用 v2.0 企业级分层
 
 API 接口:
-    GET    /                 渲染问答首页
-    GET    /api/health       健康检查
+    GET    /                 渲染意图识别测试页
+    GET    /api/health       健康检查 + 支持的意图列表
     GET    /api/version      API 版本信息
-    POST   /api/predict      单条预测 {"text": "...", "threshold": 0.3}
-    POST   /api/batch        批量预测 {"texts": [...], "threshold": 0.3}
+    POST   /api/predict      单条意图识别 {"text": "...", "threshold": 0.3}
+    POST   /api/batch        批量意图识别 {"texts": [...], "threshold": 0.3}
 
 启动方式:
-    python app.py
-    # 或通过统一入口:
     python main.py serve
 """
 
@@ -30,7 +31,7 @@ from typing import Dict, List
 
 from flask import Flask, jsonify, render_template, request
 
-from config.settings import settings, FALLBACK_SOLUTION
+from config.settings import settings, FALLBACK_RESPONSE
 from src.inference.model_manager import ModelManager
 from src.inference.predictor import Predictor
 from src.utils.exceptions import InferenceError, ModelLoadError, ModelNotFoundError
@@ -63,7 +64,7 @@ inference_service = Predictor(
 # 输入校验器
 # ============================================================
 class InputValidator:
-    """API 层输入校验 — 长度限制、内容过滤、阈值校验。"""
+    """API 层输入校验 — 用户消息长度/内容过滤、阈值校验。"""
 
     MAX_TEXT_LENGTH: int = 500
     MIN_TEXT_LENGTH: int = 2
@@ -127,7 +128,7 @@ class InputValidator:
 # Flask 应用
 # ============================================================
 app = Flask(__name__)
-API_VERSION: str = "v2.0.0"
+API_VERSION: str = "v3.0.0"
 
 
 # ============================================================
@@ -145,17 +146,21 @@ def version():
     """API 版本信息。"""
     return jsonify({
         "version": API_VERSION,
-        "service": "IoT 智能家居多标签故障问答系统",
+        "service": "电商智能客服 NLU 意图识别引擎",
     })
 
 
 @app.route("/api/health")
 def health():
-    """健康检查 — 返回模型加载状态、支持标签列表等。"""
+    """健康检查 — 返回模型加载状态、支持的意图类别、路由策略等。"""
     health_info = model_manager.health_check()
     health_info.update({
         "version": API_VERSION,
         "threshold": settings.INFERENCE_THRESHOLD,
+        "intent_routing": {
+            label: info["route"]
+            for label, info in settings.INTENT_ROUTING.items()
+        },
     })
     return jsonify(health_info)
 
@@ -166,13 +171,13 @@ def health():
 
 @app.route("/api/predict", methods=["POST"])
 def predict():
-    """单条故障文本预测。
+    """单条用户消息意图识别。
 
     Request Body:
-        {"text": "空调不制冷", "threshold": 0.3}
+        {"text": "我的订单什么时候发货", "threshold": 0.3}
 
     Response:
-        {"code": 0, "msg": "ok", "data": [...], "threshold": 0.3}
+        {"code": 0, "msg": "ok", "data": [{"label": "...", "score": 0.85, "action": {...}}], "threshold": 0.3}
     """
     try:
         data: dict = request.get_json(silent=True) or {}
@@ -234,10 +239,10 @@ def predict():
 
 @app.route("/api/batch", methods=["POST"])
 def batch_predict():
-    """批量故障文本预测。
+    """批量用户消息意图识别。
 
     Request Body:
-        {"texts": ["空调不制冷", "灯光闪烁"], "threshold": 0.3}
+        {"texts": ["我要退货", "快递到哪了"], "threshold": 0.3}
 
     Response:
         {"code": 0, "msg": "ok", "data": [[...], [...]], "total": 2, "valid": 2}
@@ -300,7 +305,12 @@ def batch_predict():
                 final_results.append([{
                     "label": "校验失败",
                     "score": 0.0,
-                    "solution": "输入文本不符合要求",
+                    "action": {
+                        "route": "fallback",
+                        "target": "无",
+                        "priority": "low",
+                        "description": "输入文本不符合要求",
+                    },
                 }])
 
         logger.info(f"批量推理完成: {len(texts)} 条")
