@@ -1,0 +1,51 @@
+# ============================================================
+# Project2_IoT_QA_System — Git 忽略规则
+# ============================================================
+
+# --- Python 缓存 ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+
+# --- 虚拟环境 ---
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- 环境变量（含密钥，不入库） ---
+.env
+
+# --- 模型文件（体积大，可选提交） ---
+output/models/*.pkl
+models/*.pkl
+
+# --- 日志 ---
+output/logs/
+*.log
+
+# --- 数据（原始数据可提交，缓存数据不提交） ---
+# data/*.csv  # 按需取消注释
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- 系统文件 ---
+*.tmp
+*.bak
